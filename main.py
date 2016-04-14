@@ -17,8 +17,9 @@ from cocos.actions.interval_actions import Speed
 from cocos.actions.interval_actions import RotateBy
 from cocos.actions.base_actions import Repeat
 from cocos.actions.instant_actions import CallFunc
+from cocos.actions.instant_actions import Hide
 from cocos.layer.util_layers import ColorLayer
-from cocos.scenes.transitions import JumpZoomTransition
+from cocos.scenes.transitions import TurnOffTilesTransition
 from pyglet.window.mouse import LEFT, RIGHT
 from cocos.collision_model import CollisionManager
 import cocos.euclid as eu
@@ -38,10 +39,11 @@ for x in path[2:]:
     enemy_action = enemy_action + MoveTo(x) 
 
 enemy_img = pyglet.resource.image('enemy.png')
+tower_img = pyglet.resource.image('tower.png')
 
 class Enemy(sprite.Sprite):
     def __init__(self, delay, death_callback,speed):
-        super().__init__('enemy.png', path[0])
+        super().__init__(enemy_img, path[0])
         self.do(Speed(delay + enemy_action + CallFunc(partial(death_callback, self)), speed))        
         x,y = path[0]
         self.cshape = CircleShape(eu.Vector2(x,y), 32)
@@ -65,7 +67,7 @@ class Splat(sprite.Sprite):
     def __init__(self, ):
         x, y = director.get_window_size()
         super().__init__("splat.png",(x/2,y/2))
-        self.do(FadeIn(0.2) + FadeOut(3) + CallFunc(self.kill))
+        self.do(FadeOut(0.0))
         
         
         
@@ -83,8 +85,8 @@ class Background(layer.Layer):
 class MainScene(scene.Scene):
     def __init__(self):
         super().__init__()
-        self.add(Background(), z=-1)
-        self.add(MainLayer())
+        self.add(Background(), z=-5)
+        self.add(MainLayer(), z=1)
         
 class MainLayer(layer.Layer):
     is_event_handler = True
@@ -98,8 +100,10 @@ class MainLayer(layer.Layer):
         self.wave_number = 0
         self.speed = 2.0
         self.new_wave()
+        self.add(Splat(), name='splat')
         self.add(text.Label("Lives: " + str(self.lives), (0, 600-52),font_size=42, color=(255,255,0,255)),name="lives")
         self.add(text.Label("Money: " + str(self.money), (0, 600-104),font_size=42, color=(255,255,0,255)), name="money")
+        self.add(text.Label("Wave: " + str(self.wave_number), (0, 600-156),font_size=42, color=(255,255,0,255)), name="wave")
         self.do(Repeat(Delay(0.01) + CallFunc(self.update)))
         
         
@@ -115,6 +119,7 @@ class MainLayer(layer.Layer):
     def update(self):
         self.get("lives").element.text = "Lives: " + str(self.lives)
         self.get("money").element.text = "Money: " + str(self.money)
+        self.get("wave").element.text = "Wave: " + str(self.wave_number)
         remove_bullet = set()
         remove_enemy = set()
         for b in self.bullets:
@@ -135,16 +140,16 @@ class MainLayer(layer.Layer):
         for item in remove_enemy:
             self.remove(item)
             self.enemies.remove(item)
-        if len(self.enemies)==0:
+        if not self.enemies:
             self.new_wave()
         
     def enemy_dies(self, enemy):
-        self.add(Splat())
+        self.get("splat").do(FadeIn(0.2) + FadeOut(3))
         self.remove(enemy)
         self.enemies.remove(enemy)
         self.lives -= 1
         if self.lives <= 0:
-            director.replace(JumpZoomTransition(GameOver(), 2.0))
+            director.replace(TurnOffTilesTransition(GameOver(), 2.0))
             
     def on_mouse_press(self, x, y, buttons, modifiers):
         x, y = director.get_virtual_coordinates(x, y)
